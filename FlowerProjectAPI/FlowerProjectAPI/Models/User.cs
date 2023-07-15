@@ -29,10 +29,10 @@ public class User
     
     public bool EmailConfirmed { get; set; }
     
-    public Dictionary<int, int>? ShoppingCart { get; set; }
+    public IEnumerable<CartItem>? ShoppingCart { get; set; }
 
     public User(string firstName, string? lastName, string email, string phoneNumber, string password, string role, 
-        Dictionary<int, int>? shoppingCart = null, int id = 0)
+        IEnumerable<CartItem>? shoppingCart = null, int id = 0)
     {
         Id = id;
         FirstName = firstName;
@@ -49,7 +49,7 @@ public class User
         }
         else if (shoppingCart == null)
         {
-            shoppingCart = new Dictionary<int, int>();
+            shoppingCart = new List<CartItem>();
         }
 
         ShoppingCart = shoppingCart;

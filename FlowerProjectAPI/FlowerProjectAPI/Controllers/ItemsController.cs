@@ -10,6 +10,37 @@ namespace FlowerProjectAPI.Controllers;
 [Route("[controller]")]
 public class ItemsController : ControllerBase
 {
+    private static Item ReadItem(IDataRecord reader)
+    {
+        var id = reader["id"] as int?;
+        var name = reader["name"] as string;
+        var categoryId = reader["category_id"] as int? ?? 0;
+        var price = reader["price"] as decimal? ?? 0;
+        var count = reader["count"] as int? ?? 0;
+        var description = reader["description"] as string;
+        var image = reader["image"] as string;
+
+        return new Item(id!.Value, name!, categoryId, price, count, description, image);
+    }
+    
+    internal static async Task<Item?> ReadById(int id)
+    {
+        const string commandText = "SELECT * FROM items WHERE id = @id";
+
+        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
+
+        cmd.Parameters.AddWithValue("id", id);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var item = ReadItem(reader);
+            return item;
+        }
+
+        return null;
+    }
+    
     private static async Task Create(Item item)
     {
         const string commandText = "INSERT INTO items (id, name, category_id, price, count, description, image) " +
@@ -27,91 +58,7 @@ public class ItemsController : ControllerBase
 
         await cmd.ExecuteNonQueryAsync();
     }
-
-    [HttpPost]
-    public IActionResult Post(Item item)
-    {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
-        try
-        {
-            Create(item).Wait();
-        }
-        catch (AggregateException e)
-        {
-            return BadRequest(e.Message);
-        }
-
-        return Created("Items", ReadById(item.Id).Result);
-    }
-
-    private static Item ReadItem(IDataRecord reader)
-    {
-        var id = reader["id"] as int?;
-        var name = reader["name"] as string;
-        var categoryId = reader["category_id"] as int? ?? 0;
-        var price = reader["price"] as decimal? ?? 0;
-        var count = reader["count"] as int? ?? 0;
-        var description = reader["description"] as string;
-        var image = reader["image"] as string;
-
-        return new Item(id!.Value, name!, categoryId, price, count, description, image);
-    }
     
-    private static async Task<List<Item>?> Read()
-    {
-        var items = new List<Item>();
-        
-        const string commandText = "SELECT * FROM items";
-
-        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
-
-        await using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            items.Add(ReadItem(reader));
-        }
-
-        return items;
-    }
-    
-    [HttpGet]
-    public IActionResult Get()
-    {
-        var result = Read().Result;
-
-        return result == null ? NotFound("items not found") : Ok(result);
-    }
-
-    public static async Task<Item?> ReadById(int id)
-    {
-        const string commandText = "SELECT * FROM items WHERE id = @id";
-
-        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
-
-        cmd.Parameters.AddWithValue("id", id);
-
-        await using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            var item = ReadItem(reader);
-            return item;
-        }
-
-        return null;
-    }
-
-    [HttpGet("byId")]
-    public IActionResult Get(int id)
-    {
-        var result = ReadById(id).Result;
-
-        return result == null ? NotFound("item not found") : Ok(result);
-    }
-
     private static async Task Update(int id, Item item)
     {
         const string commandText = @"UPDATE items
@@ -132,7 +79,71 @@ public class ItemsController : ControllerBase
 
         await cmd.ExecuteNonQueryAsync();
     }
+    
+    private static async Task DeleteItem(int id)
+    {
+        const string commandText = "DELETE FROM items WHERE id = (@id)";
+        
+        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
+        
+        cmd.Parameters.AddWithValue("id", id);
+        
+        await cmd.ExecuteNonQueryAsync();
+    }
+    
+    private static async Task<List<Item>?> Read()
+    {
+        var items = new List<Item>();
+        
+        const string commandText = "SELECT * FROM items";
 
+        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            items.Add(ReadItem(reader));
+        }
+
+        return items;
+    }
+    
+    [HttpPost]
+    public IActionResult Post(Item item)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            Create(item).Wait();
+        }
+        catch (AggregateException e)
+        {
+            return BadRequest(e.Message);
+        }
+
+        return Created("Items", ReadById(item.Id).Result);
+    }
+    
+    [HttpGet]
+    public IActionResult Get()
+    {
+        var result = Read().Result;
+
+        return result == null ? NotFound("items not found") : Ok(result);
+    }
+    
+    [HttpGet("byId")]
+    public IActionResult Get(int id)
+    {
+        var result = ReadById(id).Result;
+
+        return result == null ? NotFound("item not found") : Ok(result);
+    }
+    
     [HttpPut]
     public IActionResult Put(int id, Item item)
     {
@@ -223,18 +234,7 @@ public class ItemsController : ControllerBase
 
         return Ok("item count updated successfully");
     }
-
-    private static async Task DeleteItem(int id)
-    {
-        const string commandText = "DELETE FROM items WHERE id = (@id)";
-        
-        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
-        
-        cmd.Parameters.AddWithValue("id", id);
-        
-        await cmd.ExecuteNonQueryAsync();
-    }
-
+    
     [HttpDelete]
     public IActionResult Delete(int id)
     {

@@ -10,13 +10,13 @@ public class Order
 
     [Required] public int ClientId { get; }
 
-    [Required] public Dictionary<int, int> ShoppingCart { get; set; }
+    [Required] public IEnumerable<CartItem> ShoppingCart { get; set; }
 
     public decimal Price { get; set; }
 
     public string Status { get; set; }
 
-    public Order(int id, int clientId, Dictionary<int, int> shoppingCart, decimal price = 0, 
+    public Order(int id, int clientId, IEnumerable<CartItem> shoppingCart, decimal price = 0, 
         string status = "New Order", DateTime? dateAndTime = null)
     {
         Id = id;

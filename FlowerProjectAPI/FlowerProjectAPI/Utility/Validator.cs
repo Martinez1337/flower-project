@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using FlowerProjectAPI.Controllers;
+using FlowerProjectAPI.Models;
 
 namespace FlowerProjectAPI.Utility;
 
@@ -15,21 +16,28 @@ public static class Validator
             ? ValidationResult.Success
             : new ValidationResult($"invalid role name ({role})");
 
-    public static ValidationResult? ValidateShoppingCart(Dictionary<int, int> shoppingCart)
+    public static ValidationResult? ValidateShoppingCart(IEnumerable<CartItem> shoppingCart)
     {
-        foreach (var itemIdCountPair in shoppingCart)
+        var shoppingList = shoppingCart.ToList();
+        
+        if (!shoppingList.Any())
         {
-            var item = ItemsController.ReadById(itemIdCountPair.Key).Result;
+            return new ValidationResult("shopping cart is empty");
+        }
+        
+        foreach (var cartItem in shoppingList)
+        {
+            var item = ItemsController.ReadById(cartItem.Id).Result;
 
             if (item == null)
             {
-                return new ValidationResult($"invalid item id in shopping cart ({itemIdCountPair.Key})");
+                return new ValidationResult($"invalid item id in shopping cart ({cartItem.Id})");
             }
 
-            if (itemIdCountPair.Value > item.Count)
+            if (cartItem.Quantity > item.Count)
             {
-                return new ValidationResult($"not enough items with id {itemIdCountPair.Key} " +
-                                            $"in store ({itemIdCountPair.Value}/{item.Count})");
+                return new ValidationResult($"not enough items with id {cartItem.Id} " +
+                                            $"in store ({cartItem.Quantity}/{item.Count})");
             }
         }
 

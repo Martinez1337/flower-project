@@ -13,11 +13,41 @@ namespace FlowerProjectAPI.Controllers;
 [Route("[controller]")]
 public class UsersController : ControllerBase
 {
+    private static User ReadUser(IDataRecord reader)
+    {
+        var id = reader["id"] as int?;
+        var firstName = reader["first_name"] as string;
+        var lastName = reader["last_name"] as string;
+        var email = reader["email"] as string;
+        var phoneNumber = reader["phone_number"] as string;
+        var password = reader["password"] as string;
+        var role = reader["role"] as string;
+        var shoppingCart = JsonConvert.DeserializeObject<List<CartItem>>((reader["shopping_cart"] as string)!);
+        var emailConfirmed = reader["email_confirmed"] as bool?;
+
+        var user = new User(firstName!, lastName, email!, phoneNumber!, password!, role!, shoppingCart, id!.Value)
+        {
+            EmailConfirmed = emailConfirmed!.Value
+        };
+
+        return user;
+    }
+    
+    private void CreateTokenAndSendEmail(string email)
+    {
+        var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+        TokensController.Create(new EmailToken(email, token)).Wait();
+
+        var link = Url.Action(nameof(ConfirmEmail), "Users",
+            new { email, token }, Request.Scheme);
+        EmailSender.SendEmailConfirmationLink(email, link);
+    }
+    
     private static async Task Create(User user)
     {
         const string commandText =
-            "INSERT INTO users (first_name, last_name, email, phone_number, password, role) " +
-            "VALUES (@firstName, @lastName, @email, @phoneNumber, @password, @role)";
+            @"INSERT INTO users (first_name, last_name, email, phone_number, password, role) 
+              VALUES (@firstName, @lastName, @email, @phoneNumber, @password, @role)";
 
         await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
 
@@ -31,16 +61,148 @@ public class UsersController : ControllerBase
         await cmd.ExecuteNonQueryAsync();
     }
 
-    private void CreateTokenAndSendEmail(string email)
+    private static async Task DeleteUser(int id)
     {
-        var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-        TokensController.Create(new EmailToken(email, token)).Wait();
-
-        var link = Url.Action(nameof(ConfirmEmail), "Users",
-            new { email, token }, Request.Scheme);
-        EmailSender.SendEmailConfirmationLink(email, link);
+        const string commandText = "DELETE FROM users WHERE id = (@id)";
+        
+        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
+        
+        cmd.Parameters.AddWithValue("id", id);
+        
+        await cmd.ExecuteNonQueryAsync();
     }
+    
+    private static async Task Update(int id, User user)
+    {
+        const string commandText = @"UPDATE users
+                SET id = @id, first_name = @firstName, last_name = @lastName, email = @email, 
+                    phone_number = @phoneNumber, password = @password, role = @role, 
+                    shopping_cart = @shoppingCart, email_confirmed = @emailConfirmed
+                WHERE id = @oldId";
 
+        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
+
+        cmd.Parameters.AddWithValue("oldId", id);
+        cmd.Parameters.AddWithValue("id", user.Id);
+        cmd.Parameters.AddWithValue("firstName", user.FirstName);
+        cmd.Parameters.AddWithValue("lastName", user.LastName!);
+        cmd.Parameters.AddWithValue("email", user.Email);
+        cmd.Parameters.AddWithValue("phoneNumber", user.PhoneNumber);
+        cmd.Parameters.AddWithValue("password", user.Password);
+        cmd.Parameters.AddWithValue("role", user.Role);
+        cmd.Parameters.AddWithValue("emailConfirmed", user.EmailConfirmed);
+        cmd.Parameters.AddWithValue("shoppingCart", JsonConvert.SerializeObject(user.ShoppingCart!
+            .ToDictionary(item => item.Id, item => item.Quantity)));
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+    
+    private static async Task<List<User>?> ReadAllUsers()
+    {
+        var users = new List<User>();
+
+        const string commandText = 
+            @"SELECT u.id, u.first_name, u.last_name, u.email, u.phone_number, u.password, u.role, u.email_confirmed,
+            COALESCE(
+                (SELECT json_agg(json_build_object(
+                    'id', i.id, 
+                    'name', i.name, 
+                    'categoryId', i.category_id,
+                    'price', i.price,
+                    'count', i.count,
+                    'quantity', s.quantity,
+                    'description', i.description,
+                    'image', i.image))
+                FROM LATERAL jsonb_each_text(u.shopping_cart::jsonb) s(item_id, quantity)
+                JOIN items i ON i.id = s.item_id::int),
+                '[]'::json
+                ) AS shopping_cart
+            FROM users u
+            GROUP BY u.id";
+
+        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            users.Add(ReadUser(reader));
+        }
+
+        return users;
+    }
+    
+    public static async Task<User?> ReadById(int id)
+    {
+        const string commandText = 
+            @"SELECT u.id, u.first_name, u.last_name, u.email, u.phone_number, u.password, u.role, u.email_confirmed,
+            COALESCE(
+                (SELECT json_agg(json_build_object(
+                    'id', i.id, 
+                    'name', i.name, 
+                    'categoryId', i.category_id,
+                    'price', i.price,
+                    'count', i.count,
+                    'quantity', s.quantity,
+                    'description', i.description,
+                    'image', i.image))
+                FROM LATERAL jsonb_each_text(u.shopping_cart::jsonb) s(item_id, quantity)
+                JOIN items i ON i.id = s.item_id::int),
+                '[]'::json
+                ) AS shopping_cart
+            FROM users u
+            WHERE u.id = @id
+            GROUP BY u.id";
+
+        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
+
+        cmd.Parameters.AddWithValue("id", id);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var client = ReadUser(reader);
+            return client;
+        }
+
+        return null;
+    }
+    
+    private static async Task<User?> ReadByEmail(string email)
+    {
+        const string commandText = 
+            @"SELECT u.id, u.first_name, u.last_name, u.email, u.phone_number, u.password, u.role, u.email_confirmed,
+            COALESCE(
+                (SELECT json_agg(json_build_object(
+                    'id', i.id, 
+                    'name', i.name, 
+                    'categoryId', i.category_id,
+                    'price', i.price,
+                    'count', i.count,
+                    'quantity', s.quantity,
+                    'description', i.description,
+                    'image', i.image))
+                FROM LATERAL jsonb_each_text(u.shopping_cart::jsonb) s(item_id, quantity)
+                JOIN items i ON i.id = s.item_id::int),
+                '[]'::json
+                ) AS shopping_cart
+            FROM users u
+            WHERE u.email = @email
+            GROUP BY u.id";
+
+        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
+
+        cmd.Parameters.AddWithValue("email", email);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var client = ReadUser(reader);
+            return client;
+        }
+
+        return null;
+    }
+    
     [HttpPost]
     public IActionResult Post(User user)
     {
@@ -66,70 +228,15 @@ public class UsersController : ControllerBase
 
         return Created("Users", newUser);
     }
-
-    private static User ReadUser(IDataRecord reader)
-    {
-        var id = reader["id"] as int?;
-        var firstName = reader["first_name"] as string;
-        var lastName = reader["last_name"] as string;
-        var email = reader["email"] as string;
-        var phoneNumber = reader["phone_number"] as string;
-        var password = reader["password"] as string;
-        var role = reader["role"] as string;
-        var shoppingCart = JsonConvert.DeserializeObject<Dictionary<int, int>>((reader["shopping_cart"] as string)!);
-        var emailConfirmed = reader["email_confirmed"] as bool?;
-
-        var user = new User(firstName!, lastName, email!, phoneNumber!, password!, role!, shoppingCart, id!.Value)
-            {
-                EmailConfirmed = emailConfirmed!.Value
-            };
-
-        return user;
-    }
-
-    private static async Task<List<User>?> Read()
-    {
-        var users = new List<User>();
-
-        const string commandText = "SELECT * FROM users";
-
-        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
-
-        await using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            users.Add(ReadUser(reader));
-        }
-
-        return users;
-    }
-
+    
     [HttpGet]
     public IActionResult Get()
     {
-        var result = Read().Result;
+        var result = ReadAllUsers().Result;
 
         return result == null ? NotFound("users not found") : Ok(result);
     }
-
-    public static async Task<User?> ReadById(int id)
-    {
-        const string commandText = "SELECT * FROM users WHERE id = @id";
-
-        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
-
-        cmd.Parameters.AddWithValue("id", id);
-
-        await using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            var client = ReadUser(reader);
-            return client;
-        }
-
-        return null;
-    }
-
+    
     [HttpGet("byId")]
     public IActionResult Get(int id)
     {
@@ -138,24 +245,6 @@ public class UsersController : ControllerBase
         return result == null ? NotFound("user not found") : Ok(result);
     }
 
-    private static async Task<User?> ReadByEmail(string email)
-    {
-        const string commandText = "SELECT * FROM users WHERE email = @email";
-
-        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
-
-        cmd.Parameters.AddWithValue("email", email);
-
-        await using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            var client = ReadUser(reader);
-            return client;
-        }
-
-        return null;
-    }
-    
     [HttpGet("ConfirmEmail")]
     public IActionResult ConfirmEmail(string email, string token)
     {
@@ -188,30 +277,6 @@ public class UsersController : ControllerBase
         }
 
         return result.EmailConfirmed ? Ok(result) : BadRequest($"email {result.Email} is not confirmed");
-    }
-
-    private static async Task Update(int id, User user)
-    {
-        const string commandText = @"UPDATE users
-                SET id = @id, first_name = @firstName, last_name = @lastName, email = @email, 
-                    phone_number = @phoneNumber, password = @password, role = @role, 
-                    shopping_cart = @shoppingCart, email_confirmed = @emailConfirmed
-                WHERE id = @oldId";
-
-        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
-
-        cmd.Parameters.AddWithValue("oldId", id);
-        cmd.Parameters.AddWithValue("id", user.Id);
-        cmd.Parameters.AddWithValue("firstName", user.FirstName);
-        cmd.Parameters.AddWithValue("lastName", user.LastName!);
-        cmd.Parameters.AddWithValue("email", user.Email);
-        cmd.Parameters.AddWithValue("phoneNumber", user.PhoneNumber);
-        cmd.Parameters.AddWithValue("password", user.Password);
-        cmd.Parameters.AddWithValue("role", user.Role);
-        cmd.Parameters.AddWithValue("emailConfirmed", user.EmailConfirmed);
-        cmd.Parameters.AddWithValue("shoppingCart", JsonConvert.SerializeObject(user.ShoppingCart));
-
-        await cmd.ExecuteNonQueryAsync();
     }
 
     [HttpPut]
@@ -381,7 +446,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPatch("shoppingCart")]
-    public IActionResult PatchShoppingCart(int id, Dictionary<int, int>? newShoppingCart)
+    public IActionResult PatchShoppingCart(int id, IEnumerable<CartItem>? newShoppingCart)
     {
         var result = ReadById(id).Result;
         if (result == null)
@@ -428,15 +493,7 @@ public class UsersController : ControllerBase
 
         return Ok("email confirmation status updated successfully");
     }
-
-    private static async Task DeleteUser(int id)
-    {
-        const string commandText = "DELETE FROM users WHERE id = (@id)";
-        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
-        cmd.Parameters.AddWithValue("id", id);
-        await cmd.ExecuteNonQueryAsync();
-    }
-
+    
     [HttpDelete]
     public IActionResult Delete(int id)
     {
