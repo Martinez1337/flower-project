@@ -299,20 +299,28 @@ public class UsersController : ControllerBase
             user.EmailConfirmed = true;
         }
 
+        var isNewEmail = false;
+        
+        if (user.Email != result.Email)
+        {
+            isNewEmail = true;
+            user.EmailConfirmed = false;
+            
+            TokensController.DeleteToken(result.Email).Wait();
+        }
+
         try
         {
             Update(id, user).Wait();
+
+            if (isNewEmail)
+            { 
+                CreateTokenAndSendEmail(user.Email);
+            }
         }
         catch (AggregateException e)
         {
             return BadRequest(e.Message);
-        }
-
-        if (user.Email != result.Email)
-        {
-            TokensController.DeleteToken(result.Email).Wait();
-            
-            CreateTokenAndSendEmail(user.Email);
         }
 
         return Ok("user updated successfully");
