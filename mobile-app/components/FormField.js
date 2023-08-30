@@ -6,6 +6,7 @@ export default function FormField({
                                       field,
                                       label,
                                       secureTextEntry,
+                                      keyboardType,
                                       autoCapitalize,
                                       values,
                                       touched,
@@ -23,6 +24,7 @@ export default function FormField({
                 onChangeText={handleChange(field)}
                 onBlur={handleBlur(field)}
                 secureTextEntry={secureTextEntry}
+                keyboardType={keyboardType}
                 autoCapitalize={autoCapitalize || "none"}
             />
 
