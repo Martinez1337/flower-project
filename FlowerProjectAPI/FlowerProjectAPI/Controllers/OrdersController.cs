@@ -41,7 +41,7 @@ public class OrdersController : ControllerBase
               VALUES (@id, @clientId, @shoppingCart, @price, @status)";
 
         await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
-
+        
         cmd.Parameters.AddWithValue("id", order.Id);
         cmd.Parameters.AddWithValue("clientId", order.ClientId);
         cmd.Parameters.AddWithValue("shoppingCart",
@@ -88,6 +88,7 @@ public class OrdersController : ControllerBase
                 'id', i.id, 
                 'name', i.name, 
                 'categoryId', i.category_id,
+                'categoryName', c.name,
                 'price', i.price,
                 'count', i.count,
                 'quantity', s.quantity,
@@ -96,6 +97,7 @@ public class OrdersController : ControllerBase
             FROM orders o
             JOIN LATERAL jsonb_each_text(o.shopping_cart::jsonb) s(item_id, quantity) ON true
             JOIN items i ON i.id = s.item_id::int
+            JOIN categories c ON c.id = i.category_id::int
             GROUP BY o.id";
 
         await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
@@ -119,6 +121,7 @@ public class OrdersController : ControllerBase
                 'id', i.id, 
                 'name', i.name, 
                 'categoryId', i.category_id,
+                'categoryName', c.name,
                 'price', i.price,
                 'count', i.count,
                 'quantity', s.quantity,
@@ -127,6 +130,7 @@ public class OrdersController : ControllerBase
             FROM orders o
             JOIN LATERAL jsonb_each_text(o.shopping_cart::jsonb) s(item_id, quantity) ON true
             JOIN items i ON i.id = s.item_id::int
+            JOIN categories c ON c.id = i.category_id::int
             WHERE o.id = @id
             GROUP BY o.id";
         
@@ -156,6 +160,7 @@ public class OrdersController : ControllerBase
                 'id', i.id, 
                 'name', i.name, 
                 'categoryId', i.category_id,
+                'categoryName', c.name,
                 'price', i.price,
                 'count', i.count,
                 'quantity', s.quantity,
@@ -164,6 +169,7 @@ public class OrdersController : ControllerBase
             FROM orders o
             JOIN LATERAL jsonb_each_text(o.shopping_cart::jsonb) s(item_id, quantity) ON true
             JOIN items i ON i.id = s.item_id::int
+            JOIN categories c ON c.id = i.category_id::int
             WHERE o.client_id = @clientId
             GROUP BY o.id";
 
