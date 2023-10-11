@@ -41,6 +41,27 @@ public class ItemsController : ControllerBase
         return null;
     }
     
+    private static async Task<List<Item>?> ReadByCategoryId(int categoryId)
+    {
+        var items = new List<Item>();
+        
+        const string commandText = "SELECT * FROM items WHERE category_id = @categoryId";
+
+        await using var cmd = new NpgsqlCommand(commandText, DataBase.Connection);
+
+        cmd.Parameters.AddWithValue("categoryId", categoryId);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            items.Add(ReadItem(reader));
+        }
+
+        await reader.DisposeAsync();
+        
+        return items;
+    }
+    
     private static async Task Create(Item item)
     {
         const string commandText = "INSERT INTO items (id, name, category_id, price, count, description, image) " +
@@ -140,6 +161,14 @@ public class ItemsController : ControllerBase
     public IActionResult Get(int id)
     {
         var result = ReadById(id).Result;
+
+        return result == null ? NotFound("item not found") : Ok(result);
+    }
+    
+    [HttpGet("byCategoryId")]
+    public IActionResult GetByCategoryId(int categoryId)
+    {
+        var result = ReadByCategoryId(categoryId).Result;
 
         return result == null ? NotFound("item not found") : Ok(result);
     }

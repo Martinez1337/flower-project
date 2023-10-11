@@ -108,13 +108,15 @@ public class UsersController : ControllerBase
                     'id', i.id, 
                     'name', i.name, 
                     'categoryId', i.category_id,
+                    'categoryName', c.name,
                     'price', i.price,
                     'count', i.count,
                     'quantity', s.quantity,
                     'description', i.description,
                     'image', i.image))
                 FROM LATERAL jsonb_each_text(u.shopping_cart::jsonb) s(item_id, quantity)
-                JOIN items i ON i.id = s.item_id::int),
+                JOIN items i ON i.id = s.item_id::int
+                JOIN categories c ON c.id = i.category_id::int),
                 '[]'::json
                 ) AS shopping_cart
             FROM users u
@@ -140,13 +142,15 @@ public class UsersController : ControllerBase
                     'id', i.id, 
                     'name', i.name, 
                     'categoryId', i.category_id,
+                    'categoryName', c.name,
                     'price', i.price,
                     'count', i.count,
                     'quantity', s.quantity,
                     'description', i.description,
                     'image', i.image))
                 FROM LATERAL jsonb_each_text(u.shopping_cart::jsonb) s(item_id, quantity)
-                JOIN items i ON i.id = s.item_id::int),
+                JOIN items i ON i.id = s.item_id::int
+                JOIN categories c ON c.id = i.category_id::int),
                 '[]'::json
                 ) AS shopping_cart
             FROM users u
@@ -176,13 +180,15 @@ public class UsersController : ControllerBase
                     'id', i.id, 
                     'name', i.name, 
                     'categoryId', i.category_id,
+                    'categoryName', c.name,
                     'price', i.price,
                     'count', i.count,
                     'quantity', s.quantity,
                     'description', i.description,
                     'image', i.image))
                 FROM LATERAL jsonb_each_text(u.shopping_cart::jsonb) s(item_id, quantity)
-                JOIN items i ON i.id = s.item_id::int),
+                JOIN items i ON i.id = s.item_id::int
+                JOIN categories c ON c.id = i.category_id::int),
                 '[]'::json
                 ) AS shopping_cart
             FROM users u
