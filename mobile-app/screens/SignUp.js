@@ -1,12 +1,12 @@
 import React from 'react';
 import {Text, SafeAreaView, View, TouchableOpacity, Alert} from 'react-native';
 import {KeyboardAwareScrollView} from "react-native-keyboard-aware-scroll-view";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {Formik} from "formik";
 import FormField from "../components/FormField";
 import {registrationValidationSchema} from "../validation";
 import {globalStyles} from "../styles/globalStyles";
 import axios from "axios";
+import {API_LINK} from "../consts/links";
 
 export default function SignUp({navigation}) {
     function onSubmitHandler(values) {
@@ -24,21 +24,14 @@ export default function SignUp({navigation}) {
             .join('&');
 
         try {
-            axios({
-                method: "post",
-                url: `http://localhost:7153/Users?${query}`,
-                headers: {},
-                data: user
-            }).then((res) => {
-                AsyncStorage.setItem("user", JSON.stringify(res.data)).then()
-
-                Alert.alert("Please verify your email!","Verification link was sent to entered email!")
-
+            axios.post(`${API_LINK}/Users?${query}`, user).then((res) => {
+                Alert.alert("Please verify your email!","Verification link was sent to entered email!");
                 navigation.navigate("SignIn");
             }).catch((error) => {
+                console.log(error.response.data);
                 let res = error.response;
                 if (JSON.stringify(res.data).includes("email addresses must be unique")) {
-                    Alert.alert("Registered email", "Want to sign in?", [
+                    Alert.alert("Registered email!", "Want to sign in?", [
                         {
                             text: "Yes",
                             onPress: navigation.navigate("SignIn")
@@ -48,9 +41,16 @@ export default function SignUp({navigation}) {
                         }
                     ]);
                 }
+                if (JSON.stringify(res.data).includes("phone numbers must be unique")) {
+                    Alert.alert("Registered phone number!", "Please, use another phone number", [
+                        {
+                            text: "Ok",
+                        }
+                    ]);
+                }
             });
         } catch (error) {
-            console.log(error)
+            console.log(error);
         }
     }
 
@@ -118,6 +118,8 @@ export default function SignUp({navigation}) {
                                 errors={errors}
                                 handleChange={handleChange}
                                 handleBlur={handleBlur}
+                                keyboardType={"email-address"}
+                                autoCapitalize={false}
                             />
 
                             <FormField
@@ -128,6 +130,7 @@ export default function SignUp({navigation}) {
                                 errors={errors}
                                 handleChange={handleChange}
                                 handleBlur={handleBlur}
+                                keyboardType={"phone-pad"}
                             />
 
                             <FormField

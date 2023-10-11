@@ -1,19 +1,21 @@
 import React, {useCallback, useContext, useEffect, useState} from "react";
 import {
-    Image,
     SafeAreaView,
     ScrollView,
     Text,
     View,
     StyleSheet,
     RefreshControl,
-    Dimensions,
-    TouchableOpacity
+    TouchableOpacity,
+    ActivityIndicator
 } from "react-native";
+import {Image} from 'expo-image';
 import {FlashList} from "@shopify/flash-list";
 import axios from "axios";
+import {API_LINK} from "../consts/links";
 import OrdersHistoryItem from "../components/OrdersHistoryItem";
 import {CurrentUserContext} from "../contexts/CurrentUserContext";
+import {globalStyles} from "../styles/globalStyles";
 
 export default function Profile({navigation, route}) {
     const {currentUser} = useContext(CurrentUserContext);
@@ -21,31 +23,38 @@ export default function Profile({navigation, route}) {
 
     const [orders, setOrders] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        getOrders();
+        if (user) {
+            setLoading(true);
+            getOrders();
+        }
     }, [currentUser]);
 
     const getOrders = () => {
-        axios.get(`http://localhost:7153/Orders/byClientId?clientId=${user.id}`)
+        axios.get(`${API_LINK}/Orders/byClientId?clientId=${user.id}`)
             .then((res) => {
                 setOrders(res.data);
-                console.log("Axios get request done - orders set res.data");
+                setLoading(false);
+                console.log("Profile.js: Axios get request's done - orders are fetched");
             }).catch((e) => {
+                setLoading(false);
                 console.log(e);
-        })
+        });
     };
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
         getOrders();
         setRefreshing(false);
-        console.log("refreshed");
+        console.log("Profile.js: order history's refreshed");
     }, []);
 
     return (
-        <SafeAreaView style={{flex: 1}}>
-            <View style={{flex: 0.25}}>
+        user &&
+        <SafeAreaView style={globalStyles.container}>
+            <View>
                 <View style={styles.userNameBlock}>
                     <View style={styles.avatarContainer}>
                         <Image source={require("../assets/user-profile.png")} style={styles.avatarImage}/>
@@ -79,34 +88,50 @@ export default function Profile({navigation, route}) {
                 <Text style={styles.historyTitle}>Orders history</Text>
             </View>
 
-            <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh}/>}
-                        style={{flex: 1}}
-            >
-                {
-                    !refreshing && orders !== [] ? (
-                        <View style={{height: Dimensions.get("screen").height}}>
-                            <FlashList data={orders.sort((a, b) => b.id - a.id)} estimatedItemSize={150}
-                                       ItemSeparatorComponent={() => (
-                                           <View style={styles.itemSeparator}/>
-                                       )}
-                                       renderItem={({item}) => (
-                                           <OrdersHistoryItem navigation={navigation} orderInfo={item}/>
-                                       )}
-                                       scrollEnabled={false}
-                            />
-                        </View>
-                    ) : (
-                        <View style={{flex: 1, alignItems: "center", justifyContent: "center"}}>
-                            <Text>No orders yet</Text>
-                        </View>
-                    )
-                }
-            </ScrollView>
+            {
+                loading ? (
+                    <View style={styles.emptyDataContainer}>
+                        <ActivityIndicator size={"small"} color={"grey"}/>
+                    </View>
+                ) : (
+                    <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh}/>}
+                                showsVerticalScrollIndicator={false}
+                    >
+                        {
+                            !refreshing && orders.length !== 0 ? (
+                                <View style={{minHeight: 2}}>
+                                    <FlashList data={orders.sort((a, b) => b.id - a.id)}
+                                               estimatedItemSize={100}
+                                               scrollEnabled={false}
+                                               ItemSeparatorComponent={() => (
+                                                   <View style={styles.itemSeparator}/>
+                                               )}
+                                               renderItem={({item}) => (
+                                                   <OrdersHistoryItem navigation={navigation} orderInfo={item}/>
+                                               )}
+                                               ListHeaderComponent={() => <View style={styles.listHeader}/>}
+                                               ListFooterComponent={() => <View style={styles.listFooter}/>}
+                                    />
+                                </View>
+                            ) : (
+                                <View style={[styles.emptyDataContainer, {marginTop: 20}]}>
+                                    <Text>No orders yet</Text>
+                                </View>
+                            )
+                        }
+                    </ScrollView>
+                )
+            }
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    emptyDataContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center"
+    },
     avatarContainer: {
         borderRadius: 10,
         paddingBottom: 10,
@@ -152,10 +177,11 @@ const styles = StyleSheet.create({
     historyTitleContainer: {
         alignItems: "center",
         justifyContent: "center",
-        paddingTop: 22,
         paddingBottom: 12,
         borderBottomWidth: 1,
-        borderColor: "rgba(158, 150, 150, .4)"
+        borderColor: "rgba(158, 150, 150, .5)",
+        borderBottomLeftRadius: 15,
+        borderBottomRightRadius: 15
     },
     historyTitle: {
         fontFamily: "os-bold",
@@ -167,7 +193,12 @@ const styles = StyleSheet.create({
         tintColor: "rgba(87, 87, 87, 1)"
     },
     itemSeparator: {
-        borderWidth: 1,
-        borderColor: "rgba(158, 150, 150, .4)"
+        padding: 5
+    },
+    listHeader: {
+        paddingTop: 10
+    },
+    listFooter: {
+        paddingBottom: 10
     }
 });

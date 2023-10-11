@@ -1,28 +1,28 @@
 import React from 'react';
 import {createBottomTabNavigator} from "@react-navigation/bottom-tabs";
-import {Image} from "react-native";
+import {Image} from 'expo-image';
 import {NavigationContainer} from "@react-navigation/native";
 import UserPage from "./UserPage";
-import Catalog from "./Catalog";
 import ShoppingCart from "./ShoppingCart";
 import {globalStyles} from "../styles/globalStyles";
+import ShopPage from "./ShopPage";
 
 const BottomTab = createBottomTabNavigator();
 
 export default function Home() {
     return (
         <NavigationContainer>
-            <BottomTab.Navigator initialRouteName={'Catalog'}
-                                 screenOptions={{
-                                     headerStyle: globalStyles.header,
-                                     headerTitleStyle: globalStyles.headerText,
-                                     tabBarShowLabel: false,
-                                     tabBarActiveTintColor: "#ffffff",
-                                     tabBarInactiveTintColor: "#c388ef",
-                                     tabBarStyle: {
-                                         backgroundColor: "#ab50ee",
-                                     }
-                                 }}>
+            <BottomTab.Navigator
+                initialRouteName={'ShopPage'}
+                screenOptions={{
+                    headerStyle: globalStyles.header,
+                    headerTitleStyle: globalStyles.headerText,
+                    tabBarShowLabel: false,
+                    tabBarActiveTintColor: "#ffffff",
+                    tabBarInactiveTintColor: "#c388ef",
+                    tabBarStyle: {backgroundColor: "#ab50ee"},
+                    tabBarHideOnKeyboard: "true"
+                }}>
                 <BottomTab.Screen name={'UserPage'} component={UserPage} options={
                     {
                         headerShown: false,
@@ -35,10 +35,9 @@ export default function Home() {
                         }
                     }
                 }/>
-                <BottomTab.Screen name={'Catalog'} component={Catalog} options={
+                <BottomTab.Screen name={'ShopPage'} component={ShopPage} options={
                     {
-                        title: "Shop",
-                        headerTitleAlign: "center",
+                        headerShown: false,
                         tabBarIcon: ({color}) => {
                             return (
                                 <Image source={require("../assets/shop.png")}

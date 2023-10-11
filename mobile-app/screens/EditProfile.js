@@ -1,19 +1,34 @@
-import React, {useContext} from "react";
+import React, {useContext, useState} from "react";
 import {Alert, SafeAreaView, Text, TouchableOpacity, View} from "react-native";
 import {KeyboardAwareScrollView} from "react-native-keyboard-aware-scroll-view";
-import {globalStyles} from "../styles/globalStyles";
-import {Formik} from "formik";
-import {editPasswordValidationSchema, editUserInfoValidationSchema} from "../validation";
-import FormField from "../components/FormField";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from 'expo-secure-store';
 import {CurrentUserContext} from "../contexts/CurrentUserContext";
+import {Formik} from "formik";
+import FormField from "../components/FormField";
+import {editPasswordValidationSchema, editUserInfoValidationSchema} from "../validation";
+import axios from "axios";
+import {API_LINK} from "../consts/links";
+import {globalStyles} from "../styles/globalStyles";
+import Dialog from "react-native-dialog";
 
 export default function EditProfile ({navigation}) {
     const {currentUser} = useContext(CurrentUserContext);
     const {setCurrentUser} = useContext(CurrentUserContext);
-
     const user = JSON.parse(currentUser);
+
+    const [visible, setVisible] = useState(false);
+    const [dialogInputText, setDialogInputText] = useState("");
+    const [values, setValues] = useState({});
+
+    const showDialog = (values) => {
+        setVisible(true);
+        setValues(values);
+    };
+
+    const handleDialogCancel = () => {
+        setVisible(false);
+        setDialogInputText("");
+    };
 
     function onUserInfoChangeHandler(values) {
         let userUpdatedInfo = {
@@ -35,9 +50,9 @@ export default function EditProfile ({navigation}) {
             .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(userUpdatedInfo[k]))
             .join('&');
 
-        axios.put(`http://localhost:7153/Users?${query}`, userUpdatedInfo)
+        axios.put(`${API_LINK}/Users?${query}`, userUpdatedInfo)
             .then(() => {
-                AsyncStorage.setItem("user", JSON.stringify(userUpdatedInfo))
+                SecureStore.setItemAsync("user", JSON.stringify(userUpdatedInfo))
                     .then(() => {
                         setCurrentUser(JSON.stringify(userUpdatedInfo));
                         Alert.alert("Info update", "User info was successfully updated");
@@ -50,6 +65,16 @@ export default function EditProfile ({navigation}) {
     }
 
     function onPasswordChangeHandler(values) {
+        if (values.oldPassword !== user.password) {
+            Alert.alert("Wrong password");
+            return;
+        }
+
+        if (values.oldPassword === values.newPassword) {
+            Alert.alert("New password matches the old one");
+            return;
+        }
+
         let params = {
             "id": user.id,
             "newPassword": values.newPassword
@@ -59,13 +84,13 @@ export default function EditProfile ({navigation}) {
             .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k]))
             .join('&');
 
-        axios.patch(`http://localhost:7153/Users/password?${query}`, params)
+        axios.patch(`${API_LINK}/Users/password?${query}`, params)
             .then(() => {
                 user.password = params.newPassword;
-                AsyncStorage.setItem("user", JSON.stringify(user))
+                SecureStore.setItemAsync("user", JSON.stringify(user))
                     .then(() => {
                         setCurrentUser(JSON.stringify(user));
-                        Alert.alert("Password changing", "Password was successfully changed");
+                        Alert.alert("New password", "Password was successfully changed");
                     })
             })
             .catch(e => console.log(e))
@@ -80,6 +105,30 @@ export default function EditProfile ({navigation}) {
 
     return (
         <SafeAreaView style={globalStyles.container}>
+            <Dialog.Container visible={visible}>
+                <Dialog.Title>Info changing</Dialog.Title>
+                <Dialog.Description>
+                    Please enter your password to submit action
+                </Dialog.Description>
+                <Dialog.Input
+                    style={{fontFamily: "os-regular", fontSize: 15}}
+                    value={dialogInputText}
+                    autoCorrect={false}
+                    placeholder={"Password"}
+                    secureTextEntry={true}
+                    autoCapitalize={"none"}
+                    onChangeText={text => setDialogInputText(text)}
+                />
+                <Dialog.Button label="Cancel" onPress={handleDialogCancel}/>
+                <Dialog.Button label="Submit" onPress={() => {
+                    handleDialogCancel();
+                    if (dialogInputText === user.password) {
+                        return onUserInfoChangeHandler(values);
+                    }
+                    Alert.alert("Wrong password")
+                }}/>
+            </Dialog.Container>
+
             <KeyboardAwareScrollView
                 style={globalStyles.content}
                 showsVerticalScrollIndicator={false}
@@ -94,7 +143,7 @@ export default function EditProfile ({navigation}) {
                         email: user.email,
                         phoneNumber: user.phoneNumber
                     }}
-                    onSubmit={onUserInfoChangeHandler}
+                    onSubmit={showDialog}
                     validationSchema={editUserInfoValidationSchema}
                 >
                     {({
@@ -151,17 +200,7 @@ export default function EditProfile ({navigation}) {
                                     keyboardType={"phone-pad"}
                                 />
 
-                                <TouchableOpacity onPress={() => {
-                                    Alert.alert("Update profile info?", "", [
-                                        {
-                                            text: "Yes",
-                                            onPress: handleSubmit
-                                        },
-                                        {
-                                            text: "No"
-                                        }
-                                    ])
-                                }}>
+                                <TouchableOpacity onPress={handleSubmit}>
                                     <View style={[globalStyles.submitButton,
                                         {
                                             opacity: isValid ? 1 : 0.5,
@@ -177,7 +216,7 @@ export default function EditProfile ({navigation}) {
 
                 <Formik
                     initialValues={{
-                        oldPassword: user.password,
+                        oldPassword: "",
                         newPassword: "",
                         confirmNewPassword: ""
                     }}

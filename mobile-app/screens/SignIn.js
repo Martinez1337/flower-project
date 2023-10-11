@@ -1,15 +1,17 @@
-import React, {useState} from 'react';
+import React, {useContext} from 'react';
 import {Text, SafeAreaView, View, TouchableOpacity, Alert} from 'react-native';
 import {KeyboardAwareScrollView} from "react-native-keyboard-aware-scroll-view";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from 'expo-secure-store';
 import {authorizationValidationSchema} from "../validation";
 import {globalStyles} from "../styles/globalStyles";
 import FormField from "../components/FormField";
 import {Formik} from "formik";
 import axios from "axios";
+import {API_LINK} from "../consts/links";
+import {CurrentUserContext} from "../contexts/CurrentUserContext";
 
 export default function SignIn({navigation}) {
-    const [isUserSignedIn, setUserSignedIn] = useState(false);
+    const {setCurrentUser} = useContext(CurrentUserContext);
 
     function onSignInHandler(values) {
         let user = {
@@ -22,15 +24,14 @@ export default function SignIn({navigation}) {
             .join('&');
 
         try {
-            axios.get(`http://localhost:7153/Users/authorizeByEmail?${query}`)
-                .then((res) => {
-                AsyncStorage.setItem("user", JSON.stringify(res.data))
-                    .then(() => {
-                    setUserSignedIn(true);
-                    navigation.navigate("UserPage", {isUserInfoChanged: isUserSignedIn});
+            axios.get(`${API_LINK}/Users/authorizeByEmail?${query}`).then((res) => {
+                SecureStore.setItemAsync("user", JSON.stringify(res.data)).then(() => {
+                    setCurrentUser(JSON.stringify(res.data));
+                    navigation.navigate("UserPage");
                 });
             }).catch((error) => {
                     let res = error.response;
+                    console.log(res.data);
                     if (res.data === "user not found") {
                         Alert.alert("Unsigned user", "Want to sign up?", [
                             {
@@ -43,6 +44,9 @@ export default function SignIn({navigation}) {
                         ])
                     } else if (res.data === "incorrect password") {
                         Alert.alert("Wrong password!");
+                    } else if (res.data.includes(`email ${values.email} is not confirmed`)) {
+                        Alert.alert("Email is not confirmed!",
+                            "Please, use the verification link sent to your email");
                     }
                 });
         } catch (error) {
@@ -93,6 +97,7 @@ export default function SignIn({navigation}) {
                                     errors={errors}
                                     handleChange={handleChange}
                                     handleBlur={handleBlur}
+                                    keyboardType={"email-address"}
                                 />
 
                                 <FormField

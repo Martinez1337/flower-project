@@ -1,8 +1,7 @@
-import { StyleSheet, Platform } from "react-native";
-import Constants from "expo-constants";
+import { StyleSheet } from "react-native";
 
 const HEADER_BACKGROUND = "#ab50ee";
-const CONTENT_BACKGROUND = "#f9f9f9";
+const CONTENT_BACKGROUND = "#ffffff";
 
 export const globalStyles = StyleSheet.create({
     mainSafeArea: {
@@ -14,9 +13,7 @@ export const globalStyles = StyleSheet.create({
     },
     container: {
         flex: 1,
-        paddingTop: Constants.statusBarHeight,
-        backgroundColor:
-            Platform.OS === "ios" ? CONTENT_BACKGROUND : HEADER_BACKGROUND,
+        backgroundColor: CONTENT_BACKGROUND
     },
     header: {
         backgroundColor: HEADER_BACKGROUND,
