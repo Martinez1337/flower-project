@@ -1,5 +1,6 @@
 import React, {useState} from "react";
 import {View, Text, StyleSheet, TouchableOpacity} from "react-native";
+import {Image} from 'expo-image';
 
 export default function OrdersHistoryItem({navigation, orderInfo}) {
     const maxItemsToShow = 5;
@@ -29,7 +30,10 @@ export default function OrdersHistoryItem({navigation, orderInfo}) {
     }
 
     return (
-        <TouchableOpacity style={{flex: 1}} onPress={() => {navigation.navigate('OrderInfo', {orderInfo: orderInfo})}}>
+        <TouchableOpacity
+            style={{flex: 1}}
+            onPress={() => {navigation.navigate('OrderInfo', {orderInfo: orderInfo})}}
+        >
             <View style={styles.container}>
                 <View style={styles.orderTopInfo}>
                     <Text style={styles.orderTopInfoText}>Order ID: {order.id}</Text>
@@ -37,7 +41,10 @@ export default function OrdersHistoryItem({navigation, orderInfo}) {
                 </View>
                 <View style={styles.orderTopInfo}>
                     <Text style={styles.commonText}>{formatDate(order.dateAndTime)}</Text>
-                    <Text style={[styles.commonText, {color: 'green'}]}>{order.status}</Text>
+                    <View style={{flexDirection: "row"}}>
+                        <Image source={require("../assets/delivery-status.png")} style={styles.statusIcon}/>
+                        <Text style={[styles.commonText]}>{order.status}</Text>
+                    </View>
                 </View>
                 <View style={{paddingTop: 10, paddingLeft: 15}}>
                     <Text style={styles.orderTopInfoText}>Items:</Text>
@@ -60,13 +67,17 @@ export default function OrdersHistoryItem({navigation, orderInfo}) {
                 </View>
             </View>
         </TouchableOpacity>
-
     )
 }
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1
+        flex: 1,
+        borderWidth: 0.5,
+        borderColor: "rgba(158, 150, 150, .4)",
+        borderRadius: 25,
+        marginHorizontal: 10,
+        padding: 5
     },
     orderTopInfo: {
         flexDirection: "row",
@@ -82,7 +93,13 @@ const styles = StyleSheet.create({
     },
     moreItemsText: {
         fontFamily: "os-regular",
-        alignSelf: "center",
-        fontSize: 20
+        alignSelf: "flex-start",
+        fontSize: 20,
+        marginLeft: 10
+    },
+    statusIcon: {
+        width: 20,
+        height: 20,
+        marginHorizontal: 5
     }
 });
