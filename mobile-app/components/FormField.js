@@ -25,6 +25,7 @@ export default function FormField({
                 onBlur={handleBlur(field)}
                 secureTextEntry={secureTextEntry}
                 keyboardType={keyboardType}
+                autoCorrect={false}
                 autoCapitalize={autoCapitalize || "none"}
             />
 
