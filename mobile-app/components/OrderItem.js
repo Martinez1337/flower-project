@@ -1,5 +1,7 @@
 import React from 'react';
-import {View, Text, StyleSheet, Image, Dimensions} from "react-native";
+import {View, Text, StyleSheet, TouchableOpacity} from "react-native";
+import {Image} from 'expo-image';
+import ImageModal from 'react-native-image-modal'
 
 export default function OrderItem({navigation, route}) {
     const orderItem = {
@@ -12,9 +14,17 @@ export default function OrderItem({navigation, route}) {
     }
 
     return (
-        <View style={styles.container}>
+        <TouchableOpacity
+            style={styles.container}
+            onPress={() => navigation.navigate('Product', {item: route.item})}
+        >
             <View style={styles.imageContainer}>
-                <Image source={{uri: orderItem.imageUrl}} style={styles.itemImage}/>
+                <ImageModal source={{uri: orderItem.imageUrl}}
+                            style={styles.itemImage}
+                            placeholder={require("../assets/placeholder-image.png")}
+                            disabled={true}
+                            modalImageStyle={{flex: 1}}
+                />
             </View>
             <View style={styles.itemInfoContainer}>
                 <View style={styles.itemTitleContainer}>
@@ -30,10 +40,10 @@ export default function OrderItem({navigation, route}) {
                 </View>
                 <View style={styles.itemSubtitleContainer}>
                     <Text style={styles.itemCountText}>{orderItem.quantity} pcs</Text>
-                    <Text style={styles.itemInfoText}>{orderItem.price} {"\u{20BD}"}</Text>
+                    <Text style={styles.itemInfoText}>{orderItem.price * orderItem.quantity} {"\u{20BD}"}</Text>
                 </View>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 }
 
@@ -41,19 +51,24 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         flexDirection: "row",
+        borderWidth: 0.5,
+        borderColor: "rgba(158, 150, 150, .4)",
+        borderRadius: 25,
+        marginHorizontal: 10,
+        paddingRight: 10
     },
     imageContainer: {
         padding: 5,
         paddingRight: 10
     },
     itemInfoContainer: {
+        flex: 1,
         padding: 5,
         justifyContent: "space-between"
     },
     itemTitleContainer: {
-        flexWrap: "wrap",
-        alignItems: "flex-start",
-        width: Dimensions.get("screen").width * 0.7
+        flex: 1,
+        alignItems: "flex-start"
     },
     itemTagContainer: {
         flexDirection: "row",
@@ -61,7 +76,9 @@ const styles = StyleSheet.create({
     },
     itemSubtitleContainer: {
         flexDirection: "row",
-        justifyContent: "space-between"
+        justifyContent: "space-between",
+        marginRight: 15,
+        marginBottom: 5
     },
     itemImage: {
         width: 90,
