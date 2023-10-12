@@ -39,14 +39,6 @@ export default function Catalog({navigation}) {
         getData();
     }, []);
 
-    // useEffect(() => {
-    //     if (user === JSON.parse(currentUser)) {
-    //         return;
-    //     }
-    //     setLoading(true);
-    //     getData();
-    // }, [currentUser]);
-
     const getData = () => {
         setError(null);
         user = JSON.parse(currentUser);
