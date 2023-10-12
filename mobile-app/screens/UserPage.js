@@ -1,4 +1,4 @@
-import React, {useContext, useEffect, useState} from "react";
+import React, {useContext} from "react";
 import {Alert, Image, TouchableOpacity} from "react-native";
 import {createStackNavigator} from "@react-navigation/stack";
 import * as SecureStore from 'expo-secure-store';
@@ -13,28 +13,19 @@ import OrderInfo from "./OrderInfo";
 
 const Stack = createStackNavigator();
 
-export default function UserPage({navigation, route}) {
+export default function UserPage() {
     const {currentUser, setCurrentUser} = useContext(CurrentUserContext);
-    const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
 
     const onLogoutHandler = () => {
         SecureStore.deleteItemAsync("user").then(() => {
-            setIsUserLoggedIn(false);
-            setCurrentUser(null);
             console.log("UserPage.js: user info was cleared");
             Alert.alert("Logging out", "Successfully logged out");
         });
-    }
-
-    useEffect(() => {
-        if (currentUser !== null) {
-            console.log("UserPage.js: user data is not null");
-            setIsUserLoggedIn(true);
-        } else {
-            console.log("UserPage.js: user data is null")
-            setIsUserLoggedIn(false);
+        if (currentUser) {
+            setCurrentUser(null);
+            console.log(JSON.parse(currentUser));
         }
-    }, [currentUser]);
+    }
 
     return (
         <Stack.Navigator screenOptions={{
@@ -44,7 +35,7 @@ export default function UserPage({navigation, route}) {
             headerTitleAlign: "center",
             headerBackImage: backArrow
         }}>
-            {isUserLoggedIn ? (
+            {currentUser ? (
                 <Stack.Group>
                     <Stack.Screen name={'Profile'} component={Profile} options={{
                         headerRight: () => (

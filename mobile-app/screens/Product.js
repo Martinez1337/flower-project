@@ -1,4 +1,4 @@
-import React, {useRef, useState} from "react";
+import React, {useContext, useRef, useState} from "react";
 import {
     SafeAreaView,
     StyleSheet,
@@ -9,37 +9,75 @@ import {
     TextInput,
     ScrollView,
     KeyboardAvoidingView,
-    Platform
+    Platform, Alert
 } from "react-native";
 import ImageView from "react-native-image-viewing";
 import {globalStyles} from "../styles/globalStyles";
 import {useHeaderHeight} from '@react-navigation/elements';
+import axios from "axios";
+import {API_LINK} from "../consts/links";
+import {CurrentUserContext} from "../contexts/CurrentUserContext";
 
-export default function Product({route}) {
+export default function Product({navigation, route}) {
+    const {currentUser, setCurrentUser} = useContext(CurrentUserContext);
+    const user = JSON.parse(currentUser);
+
     const {item} = route.params;
     const headerHeight = useHeaderHeight();
 
     const [isImageVisible, setIsImageVisible] = useState(false);
-    const [itemAddCount, setItemAddCount] = useState(1);
+    const [itemAddCount, setItemAddCount] = useState(() => {
+        if (item.isInCart) {
+            const cartItem = user.shoppingCart.find(cartItem => cartItem.id === item.id);
+            if (cartItem) {
+                return cartItem.quantity;
+            } else {
+                item.isInCart = false;
+                return 1;
+            }
+        } else {
+            return 1;
+        }
+    });
+
     const inputRef = useRef(null);
 
     const handleIncrement = () => {
         setItemAddCount(itemAddCount + 1);
+        const itemIndex = user.shoppingCart.findIndex(cartItem => item.id === cartItem.id);
+        if (itemIndex >= 0) {
+            user.shoppingCart[itemIndex].quantity += 1;
+            setCurrentUser(JSON.stringify(user));
+        }
     };
 
     const handleDecrement = () => {
         if (itemAddCount > 1) {
             setItemAddCount(itemAddCount - 1);
+            const itemIndex = user.shoppingCart.findIndex(cartItem => item.id === cartItem.id);
+            if (itemIndex >= 0) {
+                user.shoppingCart[itemIndex].quantity -= 1;
+                setCurrentUser(JSON.stringify(user));
+            }
         }
     };
 
     const handleInputChange = (text) => {
+        const itemIndex = user.shoppingCart.findIndex(cartItem => item.id === cartItem.id);
         if (text === '') {
             setItemAddCount(1);
+            if (itemIndex >= 0) {
+                user.shoppingCart[itemIndex].quantity = 1;
+                setCurrentUser(JSON.stringify(user));
+            }
         } else {
             const number = parseInt(text, 10);
             if (!isNaN(number) && number >= 1) {
                 setItemAddCount(number);
+                if (itemIndex >= 0) {
+                    user.shoppingCart[itemIndex].quantity = number;
+                    setCurrentUser(JSON.stringify(user));
+                }
             }
         }
     };
@@ -56,6 +94,42 @@ export default function Product({route}) {
             setItemAddCount(1);
         }
     };
+
+    const addToCart = ({item}) => {
+        if (user) {
+            console.log("Add to cart " + item.name);
+
+            user.shoppingCart.push({ ...item, quantity: itemAddCount });
+
+            axios.patch(`${API_LINK}/Users/shoppingCart?id=${user.id}`, user.shoppingCart).then(() => {
+                setCurrentUser(() => JSON.stringify(user));
+            }).catch(error => console.log(error));
+
+            item.isInCart = true;
+        } else {
+            Alert.alert("Sign In", "To continue, please, sign in", [
+                {
+                    text: "Ok",
+                    onPress: () => {navigation.navigate('UserPage')}
+                },
+                {
+                    text: "Cancel"
+                }
+            ]);
+        }
+    }
+
+    const deleteFromCart = ({cartItem}) => {
+        if (user) {
+            user.shoppingCart = user.shoppingCart.filter((item) => item.id !== cartItem.id);
+
+            axios.patch(`${API_LINK}/Users/shoppingCart?id=${user.id}`, user.shoppingCart).then(() => {
+                setCurrentUser(() => JSON.stringify(user));
+            }).catch(error => console.log(error));
+
+            cartItem.isInCart = false;
+        }
+    }
 
     return (
         <SafeAreaView style={globalStyles.container}>
@@ -134,9 +208,13 @@ export default function Product({route}) {
                             </View>
                         </TouchableOpacity>
 
-                        <TouchableOpacity>
-                            <View style={styles.addButton}>
-                                <Text style={styles.buttonText}>Add to cart</Text>
+                        <TouchableOpacity
+                            onPress={() => !item.isInCart
+                                ? addToCart({item: item})
+                                : deleteFromCart({cartItem: item})}
+                        >
+                            <View style={[styles.addButton, {backgroundColor: item.isInCart ? "#c388ef" : "#ab50ee"}]}>
+                                <Text style={styles.buttonText}>{item.isInCart ? "Added to cart" : "Add to cart"}</Text>
                             </View>
                         </TouchableOpacity>
                     </View>
@@ -262,7 +340,6 @@ const styles = StyleSheet.create({
     addButton: {
         flex: 1,
         borderRadius: 15,
-        backgroundColor: "#ab50ee",
         padding: 11,
         marginHorizontal: 10,
         alignItems: "center",

@@ -17,20 +17,20 @@ import OrdersHistoryItem from "../components/OrdersHistoryItem";
 import {CurrentUserContext} from "../contexts/CurrentUserContext";
 import {globalStyles} from "../styles/globalStyles";
 
-export default function Profile({navigation, route}) {
+export default function Profile({navigation}) {
     const {currentUser} = useContext(CurrentUserContext);
     const user = JSON.parse(currentUser);
 
-    const [orders, setOrders] = useState([]);
+    const [orders, setOrders] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (user) {
+        if (user && !orders) {
             setLoading(true);
             getOrders();
         }
-    }, [currentUser]);
+    }, []);
 
     const getOrders = () => {
         axios.get(`${API_LINK}/Orders/byClientId?clientId=${user.id}`)
@@ -98,7 +98,7 @@ export default function Profile({navigation, route}) {
                                 showsVerticalScrollIndicator={false}
                     >
                         {
-                            !refreshing && orders.length !== 0 ? (
+                            !refreshing && orders ? (
                                 <View style={{minHeight: 2}}>
                                     <FlashList data={orders.sort((a, b) => b.id - a.id)}
                                                estimatedItemSize={100}

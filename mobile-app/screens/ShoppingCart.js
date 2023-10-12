@@ -1,24 +1,50 @@
-import React, {useContext} from "react";
+import React, {useContext, useEffect, useState} from "react";
 import {Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View} from "react-native";
 import {globalStyles} from "../styles/globalStyles";
 import {Image} from "expo-image";
 import {CurrentUserContext} from "../contexts/CurrentUserContext";
 import {FlashList} from "@shopify/flash-list";
 import CartItem from "../components/CartItem";
+import axios from "axios";
+import {API_LINK} from "../consts/links";
 
 export default function ShoppingCart({navigation}) {
-    const {currentUser} = useContext(CurrentUserContext);
+    const {currentUser, setCurrentUser} = useContext(CurrentUserContext);
     const user = JSON.parse(currentUser);
 
-    user && console.log("ShoppingCart.js: shoppingCart = " + JSON.stringify(user.shoppingCart));
-
-    const totalCartPrice = user
-        ? user.shoppingCart.reduce((sum, product) => {
+    const [totalCartPrice, setTotalCartPrice] = useState(() =>
+        user ? user.shoppingCart.reduce((sum, product) => {
             const productTotal = product.price * product.quantity;
             return sum + productTotal;
         }, 0)
-        : null;
+        : null)
 
+    useEffect(() => {
+        setTotalCartPrice(user?.shoppingCart.reduce((sum, product) => {
+            const productTotal = product.price * product.quantity;
+            return sum + productTotal}, 0));
+    }, [user?.shoppingCart]);
+
+
+    const deleteFromCart = ({cartItem}) => {
+        user.shoppingCart = user.shoppingCart.filter((item) => item.id !== cartItem.id);
+
+        axios.patch(`${API_LINK}/Users/shoppingCart?id=${user.id}`, user.shoppingCart).then(() => {
+            setCurrentUser(() => JSON.stringify(user));
+        }).catch(error => console.log(error));
+
+        cartItem.isInCart = false;
+    }
+
+    const submitOrder = () => {
+        axios.patch(`${API_LINK}/Users/shoppingCart?id=${user.id}`, user.shoppingCart).then(() => {
+            axios.post(`${API_LINK}/Orders/shoppingCart?clientId=${user.id}`).then(() => {
+                user.shoppingCart = [];
+                setCurrentUser(JSON.stringify(user));
+                Alert.alert("Success!", "Your order was successfully submitted!");
+            }).catch(e => console.log(e.response.data));
+        }).catch(e => console.log(e.response.data));
+    }
     return (
         <SafeAreaView style={globalStyles.container}>
             <View style={styles.listTitleContainer}>
@@ -33,7 +59,11 @@ export default function ShoppingCart({navigation}) {
                             <FlashList
                                 data={user.shoppingCart}
                                 renderItem={({item}) =>
-                                    <CartItem navigation={navigation} cartItem={item}/>
+                                    <CartItem
+                                        navigation={navigation}
+                                        cartItem={item}
+                                        deleteFromCart={deleteFromCart}
+                                    />
                                 }
                                 estimatedItemSize={100}
                                 ItemSeparatorComponent={() =>
@@ -44,12 +74,13 @@ export default function ShoppingCart({navigation}) {
                             />
                         </View>
                         <View style={styles.subtitleContainer}>
-                            <Text style={styles.subtitleInfoText}>Total price: {totalCartPrice}</Text>
+                            <Text style={styles.subtitleInfoText}>Total price: {totalCartPrice} {"\u{20BD}"}</Text>
 
                             <TouchableOpacity onPress={() => {
                                 Alert.alert("Order submission", "Submit order?", [
                                     {
                                         text: "Yes",
+                                        onPress: submitOrder
                                     },
                                     {
                                         text: "No"

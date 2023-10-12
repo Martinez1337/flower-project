@@ -27,6 +27,7 @@ export default function SignIn({navigation}) {
             axios.get(`${API_LINK}/Users/authorizeByEmail?${query}`).then((res) => {
                 SecureStore.setItemAsync("user", JSON.stringify(res.data)).then(() => {
                     setCurrentUser(JSON.stringify(res.data));
+                    console.log("SignIn.js: current user = " + JSON.stringify(res.data))
                     navigation.navigate("UserPage");
                 });
             }).catch((error) => {

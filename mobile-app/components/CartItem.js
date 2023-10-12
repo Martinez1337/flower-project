@@ -1,28 +1,60 @@
-import React, {useRef, useState} from "react";
+import React, {useContext, useEffect, useRef, useState} from "react";
 import {Image, StyleSheet, Text, TextInput, TouchableOpacity, View} from "react-native";
 import ImageModal from "react-native-image-modal";
+import {CurrentUserContext} from "../contexts/CurrentUserContext";
 
-export default function CartItem({navigation, cartItem}) {
+export default function CartItem({navigation, cartItem, deleteFromCart}) {
     const [itemCount, setItemCount] = useState(cartItem.quantity);
+    const [itemPrice, setItemPrice] = useState(cartItem.price * cartItem.quantity);
     const inputRef = useRef(null);
+
+    const {currentUser, setCurrentUser} = useContext(CurrentUserContext);
+    const user = JSON.parse(currentUser);
+
+    useEffect(() => {
+        setItemPrice(cartItem.price * itemCount);
+    }, [itemCount])
+
+    useEffect(() => {
+        setItemCount(cartItem.quantity);
+    }, [cartItem.quantity])
 
     const handleIncrement = () => {
         setItemCount(itemCount + 1);
+        const itemIndex = user.shoppingCart.findIndex(item => item.id === cartItem.id);
+        if (itemIndex >= 0) {
+            user.shoppingCart[itemIndex].quantity += 1;
+            setCurrentUser(JSON.stringify(user));
+        }
     };
 
     const handleDecrement = () => {
         if (itemCount > 1) {
             setItemCount(itemCount - 1);
+            const itemIndex = user.shoppingCart.findIndex(item => item.id === cartItem.id);
+            if (itemIndex >= 0) {
+                user.shoppingCart[itemIndex].quantity -= 1;
+                setCurrentUser(JSON.stringify(user));
+            }
         }
     };
 
     const handleInputChange = (text) => {
+        const itemIndex = user.shoppingCart.findIndex(item => item.id === cartItem.id);
         if (text === '') {
             setItemCount(1);
+            if (itemIndex >= 0) {
+                user.shoppingCart[itemIndex].quantity = 1;
+                setCurrentUser(JSON.stringify(user));
+            }
         } else {
             const number = parseInt(text, 10);
             if (!isNaN(number) && number >= 1) {
                 setItemCount(number);
+                if (itemIndex >= 0) {
+                    user.shoppingCart[itemIndex].quantity = number;
+                    setCurrentUser(JSON.stringify(user));
+                }
             }
         }
     };
@@ -41,7 +73,10 @@ export default function CartItem({navigation, cartItem}) {
     };
 
     return (
-        <TouchableOpacity style={styles.container}>
+        <TouchableOpacity
+            style={styles.container}
+            onPress={() => navigation.navigate('Product', {item: cartItem})}
+        >
             <View style={styles.imageContainer}>
                 <ImageModal source={{uri: cartItem.image}}
                             style={styles.itemImage}
@@ -88,13 +123,16 @@ export default function CartItem({navigation, cartItem}) {
                             <Text style={[styles.buttonText, {fontSize: 18}]}>+</Text>
                         </View>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.deleteContainer}>
+                    <TouchableOpacity
+                        style={styles.deleteContainer}
+                        onPress={() => {deleteFromCart({cartItem: cartItem})}}
+                    >
                         <Image source={require("../assets/delete.png")} style={styles.deleteIcon}/>
                     </TouchableOpacity>
                 </View>
                 <View style={{marginTop: 5}}>
                     <Text style={[styles.itemInfoText, {marginLeft: -30}]}>
-                        {cartItem.price * cartItem.quantity} {"\u{20BD}"}
+                        {itemPrice} {"\u{20BD}"}
                     </Text>
                 </View>
             </View>

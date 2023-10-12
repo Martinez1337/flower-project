@@ -12,8 +12,7 @@ import {globalStyles} from "../styles/globalStyles";
 import Dialog from "react-native-dialog";
 
 export default function EditProfile ({navigation}) {
-    const {currentUser} = useContext(CurrentUserContext);
-    const {setCurrentUser} = useContext(CurrentUserContext);
+    const {currentUser, setCurrentUser} = useContext(CurrentUserContext);
     const user = JSON.parse(currentUser);
 
     const [visible, setVisible] = useState(false);

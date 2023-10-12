@@ -42,6 +42,7 @@ export default function App() {
                         SecureStore.setItemAsync('user', JSON.stringify(res.data)).then(() => {
                             console.log("App.js: Latest user data was successfully set");
                         })
+                        setCurrentUser(JSON.stringify(res.data));
                     }).catch(e => {
                         console.log(e);
                         setError(e);

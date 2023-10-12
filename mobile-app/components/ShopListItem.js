@@ -1,11 +1,12 @@
 import React from "react";
 import {StyleSheet, Text, TouchableOpacity, View, Image} from "react-native";
 
-export default function ShopListItem({navigation, item}) {
+export default function ShopListItem({navigation, item, addToCart, deleteFromCart}) {
     return (
         <TouchableOpacity
             style={styles.container}
-            onPress={() => {navigation.navigate('Product', {item: item})}}
+            onPress={() =>
+            {navigation.navigate('Product', {item: item})}}
         >
             <View style={styles.imageContainer}>
                 <Image source={{uri: item.image}} style={styles.itemImage}/>
@@ -19,9 +20,13 @@ export default function ShopListItem({navigation, item}) {
             </View>
             <View style={styles.cardSubtitleContainer}>
                 <Text style={[styles.itemInfoText, {fontSize: 16}]}>{item.price} {"\u{20BD}"}</Text>
-                <TouchableOpacity onPress={() => {}}>
-                    <View style={styles.addButton}>
-                        <Text style={styles.addButtonText}>Add</Text>
+                <TouchableOpacity
+                    onPress={() => !item.isInCart
+                        ? addToCart({item: item})
+                        : deleteFromCart({cartItem: item})}
+                >
+                    <View style={[styles.addButton, {backgroundColor: item.isInCart ? "#c388ef" : "#ab50ee"}]}>
+                        <Text style={styles.addButtonText}>{item.isInCart ? "Added" : "Add"}</Text>
                     </View>
                 </TouchableOpacity>
             </View>
@@ -73,7 +78,6 @@ const styles = StyleSheet.create({
     },
     addButton: {
         flex: 1,
-        backgroundColor: "#ab50ee",
         borderRadius: 25,
         padding: 5,
         paddingHorizontal: 10

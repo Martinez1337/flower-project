@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from "react";
+import React, {useCallback, useContext, useEffect, useState} from "react";
 import {
     SafeAreaView,
     Text,
@@ -9,7 +9,7 @@ import {
     TextInput,
     RefreshControl,
     ScrollView,
-    FlatList
+    FlatList, Alert
 } from "react-native";
 import {Image} from 'expo-image';
 import axios from "axios";
@@ -18,6 +18,7 @@ import {FlashList} from "@shopify/flash-list";
 import ShopListItem from "../components/ShopListItem";
 import CategoryTag from "../components/CategoryTag";
 import {globalStyles} from "../styles/globalStyles";
+import {CurrentUserContext} from "../contexts/CurrentUserContext";
 
 export default function Catalog({navigation}) {
     const [items, setItems] = useState([]);
@@ -29,6 +30,50 @@ export default function Catalog({navigation}) {
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
+
+    const {currentUser, setCurrentUser} = useContext(CurrentUserContext);
+    let user = JSON.parse(currentUser);
+
+    useEffect(() => {
+        setLoading(true);
+        getData();
+    }, []);
+
+    // useEffect(() => {
+    //     if (user === JSON.parse(currentUser)) {
+    //         return;
+    //     }
+    //     setLoading(true);
+    //     getData();
+    // }, [currentUser]);
+
+    const getData = () => {
+        setError(null);
+        user = JSON.parse(currentUser);
+        try {
+            axios.get(`${API_LINK}/Items`).then((itemsRes) => {
+                console.log("Catalog.js: Axios get request's done - items are fetched");
+                axios.get(`${API_LINK}/Categories`).then((categoriesRes) => {
+                    console.log("Catalog.js: Axios get request's done - categories are fetched");
+                    const taggedCategories = categoriesRes.data.map(category => ({...category, isTagged: false}))
+                    setItems(itemsRes.data.map((item) => {
+                        const category = taggedCategories.find(category => category.id === item.categoryId);
+                        const isInCart = user ? user.shoppingCart.some(cartItem => cartItem.id === item.id) : false;
+                        if (category) {
+                            return {...item, categoryName: category.name, isInCart: isInCart};
+                        }
+                        return {...item, isInCart: isInCart};
+                    }));
+                    setCategories(taggedCategories);
+                });
+            });
+        } catch (error) {
+            setError(error);
+            console.log(error);
+        } finally {
+            setLoading(false);
+        }
+    }
 
     const filteredData = items.filter(item => {
         const searchMatches = item.name
@@ -46,40 +91,9 @@ export default function Catalog({navigation}) {
         return searchMatches && categoryMatches;
     });
 
-    useEffect(() => {
-        setLoading(true);
-        getData();
-    }, []);
-
-    const getData = () => {
-        setError(null);
-        try {
-            axios.get(`${API_LINK}/Items`).then((itemsRes) => {
-                console.log("Catalog.js: Axios get request's done - items are fetched");
-                axios.get(`${API_LINK}/Categories`).then((categoriesRes) => {
-                    console.log("Catalog.js: Axios get request's done - categories are fetched");
-                    const taggedCategories = categoriesRes.data.map(category => ({...category, isTagged: false}))
-                    setItems(itemsRes.data.map((item) => {
-                        const category = taggedCategories.find((category) => category.id === item.categoryId);
-                        if (category) {
-                            return {...item, categoryName: category.name};
-                        }
-                        return item;
-                    }));
-                    setCategories(taggedCategories);
-                    });
-                });
-        } catch (error) {
-            setError(error);
-            console.log(error);
-        } finally {
-            setLoading(false);
-        }
-    }
-
     const onRefresh = useCallback(() => {
         setRefreshing(true);
-        void getData();
+        getData();
         setRefreshing(false);
         console.log("Catalog.js: catalog data was refreshed");
     }, []);
@@ -89,6 +103,42 @@ export default function Catalog({navigation}) {
             category.id === id ? {...category, isTagged: newValue} : category
         ));
     };
+
+    const addToCart = ({item}) => {
+        if (user) {
+            console.log("Add to cart " + item.name);
+
+            user.shoppingCart.push({ ...item, quantity: 1 });
+
+            axios.patch(`${API_LINK}/Users/shoppingCart?id=${user.id}`, user.shoppingCart).then(() => {
+                setCurrentUser(() => JSON.stringify(user));
+            }).catch(error => console.log(error.data));
+
+            item.isInCart = true;
+        } else {
+            Alert.alert("Sign In", "To continue, please, sign in", [
+                {
+                    text: "Ok",
+                    onPress: () => {navigation.navigate('UserPage')}
+                },
+                {
+                    text: "Cancel"
+                }
+            ]);
+        }
+    }
+
+    const deleteFromCart = ({cartItem}) => {
+        if (user) {
+            user.shoppingCart = user.shoppingCart.filter((item) => item.id !== cartItem.id);
+
+            axios.patch(`${API_LINK}/Users/shoppingCart?id=${user.id}`, user.shoppingCart).then(() => {
+                setCurrentUser(() => JSON.stringify(user));
+            }).catch(error => console.log(error));
+
+            cartItem.isInCart = false;
+        }
+    }
 
     if (loading) {
         return (
@@ -171,7 +221,12 @@ export default function Catalog({navigation}) {
                     data={filteredData}
                     numColumns={2}
                     renderItem={({item}) =>
-                        <ShopListItem navigation={navigation} item={item}/>
+                        <ShopListItem
+                            navigation={navigation}
+                            item={item}
+                            addToCart={addToCart}
+                            deleteFromCart={deleteFromCart}
+                        />
                     }
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh}/>}
                     ItemSeparatorComponent={() =>
